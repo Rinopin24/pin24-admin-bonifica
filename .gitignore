@@ -1,0 +1,20 @@
+# macOS / Windows / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
+
+# File temporanei generati durante test
+*_final.xlsx
+*_diff_istat.xlsx
+*_issues_testo.csv
+*_excluded_outliers.xlsx
+*_geocoding_low.xlsx
+T_Punti_Vendita*.xlsx
+tour_pvr_*.xlsx
+
+# Cache locali (mai committare dati operatori)
+*.cache.json
+geocoding-cache*.json
