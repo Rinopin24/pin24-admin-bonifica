@@ -60,12 +60,37 @@
         <small class="setup-hint">Formato: <code>gg/mm/aaaa</code>. Range ammesso: ±90 giorni da oggi.</small>
       </div>
 
-      <div class="setup-field">
-        <label for="setup-regione">Regione tour <span class="required">*</span></label>
-        <select id="setup-regione" required>
-          <option value="">— Seleziona —</option>
-        </select>
-        <small class="setup-hint">La sigla ISTAT 3 lettere verrà inserita nel Tour ID (es. <code>PUG</code> per Puglia).</small>
+      <div class="setup-field" id="setup-field-regione">
+        <label>Regione tour <span class="required">*</span></label>
+
+        <!-- Stato "rilevata dal file" mostrato come default dopo il drop -->
+        <div class="region-detected" id="region-detected-block">
+          <div class="region-detected-info">
+            <span class="region-detected-label">Lettura del file in corso…</span>
+          </div>
+          <div class="region-detected-actions hidden" id="region-detected-actions">
+            <button class="btn-primary btn-sm" id="btn-region-confirm" type="button">Conferma</button>
+            <button class="btn-ghost btn-sm" id="btn-region-modify" type="button">Modifica regione</button>
+          </div>
+          <div class="region-confirmed hidden" id="region-confirmed-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            <span>Regione confermata: <strong id="region-confirmed-label">—</strong></span>
+            <button class="btn-link" id="btn-region-change" type="button">Cambia</button>
+          </div>
+        </div>
+
+        <!-- Stato override manuale: dropdown visibile solo se l'utente clicca Modifica
+             o se l'auto-detect fallisce -->
+        <div class="region-override hidden" id="region-override-block">
+          <select id="setup-regione" required>
+            <option value="">— Seleziona regione —</option>
+          </select>
+          <div class="region-override-notice hidden" id="region-override-notice">
+            Stai forzando una regione diversa da quella rilevata. Procedi solo se sei sicuro.
+          </div>
+        </div>
+
+        <small class="setup-hint">La sigla ISTAT 3 lettere verrà inserita nel Tour ID (es. <code>PUG</code> per Puglia). L'app la rileva dal file ma puoi sempre modificarla.</small>
       </div>
 
       <div class="setup-field">
@@ -166,6 +191,8 @@
   <span>Rino Cuomo · 2026</span>
   <span class="footer-spacer">·</span>
   <span>Tutto in locale, nessun dato lascia questo PC</span>
+  <span class="footer-spacer">·</span>
+  <span class="footer-version" id="footer-version-tag">—</span>
 </footer>
 
 <script src="js/xlsx-io.js"></script>
