@@ -19,7 +19,7 @@
     <span class="brand-pin">PIN24</span>
     <span class="brand-sub">Admin · Bonifica file PVR</span>
   </div>
-  <div class="version">v0.1 MVP1</div>
+  <div class="version">v1.1 MVP2</div>
 </header>
 
 <main class="container">
@@ -39,6 +39,52 @@
       <input type="file" id="file-input" accept=".xlsx,.xls" hidden>
       <button class="btn-primary" id="btn-pick">Seleziona file</button>
       <p class="dz-hint">Il file resta locale sul tuo PC. Nessun caricamento sul web.</p>
+    </div>
+  </section>
+
+  <!-- ═════════════ SETUP TOUR ═════════════
+       Form bloccante mostrato DOPO il drop file e PRIMA del processing.
+       3 input: data inizio (obbligatorio), regione (obbligatoria), cliente
+       (opzionale). Tour ID auto-calcolato e mostrato in anteprima.
+       MVP2 — decisione 2026-05-25, vedi project_coordinamento_admin_field_pipeline. -->
+  <section id="tour-setup" class="tour-setup hidden">
+    <header class="setup-header">
+      <h2>Setup tour</h2>
+      <p class="setup-sub">Compila i dati del tour prima di elaborare il file. Servono per generare il <strong>Tour ID</strong> univoco usato in tutta la pipeline (file, report, mappe, archivio).</p>
+    </header>
+
+    <div class="setup-form">
+      <div class="setup-field">
+        <label for="setup-data-inizio">Data inizio tour <span class="required">*</span></label>
+        <input type="date" id="setup-data-inizio" required>
+        <small class="setup-hint">Formato: <code>gg/mm/aaaa</code>. Range ammesso: ±90 giorni da oggi.</small>
+      </div>
+
+      <div class="setup-field">
+        <label for="setup-regione">Regione tour <span class="required">*</span></label>
+        <select id="setup-regione" required>
+          <option value="">— Seleziona —</option>
+        </select>
+        <small class="setup-hint">La sigla ISTAT 3 lettere verrà inserita nel Tour ID (es. <code>PUG</code> per Puglia).</small>
+      </div>
+
+      <div class="setup-field">
+        <label for="setup-cliente">Cliente / committente</label>
+        <input type="text" id="setup-cliente" placeholder="Opzionale (es. ENI, REWE)" maxlength="40">
+        <small class="setup-hint">Utile solo se hai più committenti da distinguere nei report. Lascia vuoto se non necessario.</small>
+      </div>
+
+      <div class="setup-preview hidden" id="setup-preview">
+        <span class="preview-label">Tour ID che verrà creato:</span>
+        <strong class="preview-id" id="setup-preview-id">—</strong>
+      </div>
+
+      <div class="setup-error hidden" id="setup-error"></div>
+
+      <div class="setup-actions">
+        <button class="btn-secondary" id="btn-setup-cancel" type="button">Annulla</button>
+        <button class="btn-primary" id="btn-setup-confirm" type="button" disabled>Avvia elaborazione</button>
+      </div>
     </div>
   </section>
 
@@ -127,6 +173,7 @@
 <script src="js/istat.js"></script>
 <script src="js/region-filter.js"></script>
 <script src="js/geocoding.js"></script>
+<script src="js/tour-id.js"></script>
 <script src="js/export.js"></script>
 <script src="js/app.js"></script>
 </body>

@@ -16,7 +16,10 @@
     afterIstat: { rows: [], diffs: [], stats: {} },
     afterRegion: { ready: [], excluded: [], detected: null, pct: 0, distribution: {} },
     afterGeo: { rows: [], stats: {} },
-    selectedRegion: null
+    selectedRegion: null,
+    // Setup tour MVP2: { tour_id, data_inizio, regione_sigla, regione_label, cliente }
+    // Popolato dal form setup tour dopo il drop file, PRIMA dell'elaborazione.
+    tourSetup: null
   };
 
   // ───────── DOM refs ─────────
@@ -46,6 +49,179 @@
   const btnRestartError = $('btn-restart-error');
   const btnExportAll = $('btn-export-all');
 
+  // ───────── Setup tour MVP2 — DOM refs ─────────
+  const tourSetup = $('tour-setup');
+  const setupDataInizio = $('setup-data-inizio');
+  const setupRegione = $('setup-regione');
+  const setupCliente = $('setup-cliente');
+  const setupPreview = $('setup-preview');
+  const setupPreviewId = $('setup-preview-id');
+  const setupError = $('setup-error');
+  const btnSetupCancel = $('btn-setup-cancel');
+  const btnSetupConfirm = $('btn-setup-confirm');
+
+  // ═══════════════════════════════════════════════════════════════
+  //   SETUP TOUR MVP2 — form bloccante dopo drop file
+  // ═══════════════════════════════════════════════════════════════
+  // Flow: drop file → showSetupForm(file) → 3 input compilati →
+  // preview Tour ID live → click "Avvia elaborazione" → handleFile(file)
+  // riceve state.tourSetup popolato.
+  //
+  // Vincolo: data + regione obbligatorie non-skippabili (decisione
+  // 2026-05-25, vedi project_coordinamento_admin_field_pipeline memoria).
+
+  function showSetupForm(file) {
+    // Memorizza il file ma NON parte ancora l'elaborazione
+    state.file = file;
+    state.baseName = file.name;
+    state.tourSetup = null;
+
+    // Reset campi form
+    setupDataInizio.value = todayIso();
+    setupRegione.value = '';
+    setupCliente.value = '';
+    setupError.classList.add('hidden');
+    setupPreview.classList.add('hidden');
+    btnSetupConfirm.disabled = true;
+
+    // Mostra setup, nascondi dropzone
+    dz.classList.add('hidden');
+    tourSetup.classList.remove('hidden');
+
+    // Forza re-render anteprima (data default = oggi può già essere valida
+    // ma manca regione, quindi rimane disabilitato)
+    onSetupChange();
+  }
+
+  function hideSetupForm() {
+    tourSetup.classList.add('hidden');
+  }
+
+  function populateSetupRegions() {
+    if (!window.TOUR_ID) return;
+    // Pulisci option precedenti tranne il placeholder
+    while (setupRegione.options.length > 1) {
+      setupRegione.remove(1);
+    }
+    TOUR_ID.REGION_LIST.forEach(label => {
+      const opt = document.createElement('option');
+      opt.value = label;
+      opt.textContent = label;
+      setupRegione.appendChild(opt);
+    });
+  }
+
+  // Ritorna stringa YYYY-MM-DD (data corrente) per default <input type="date">
+  function todayIso() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  // Validazione del setup: ritorna { ok, error?, tourSetup? }
+  function validateSetup() {
+    const data = setupDataInizio.value.trim();
+    const regione = setupRegione.value.trim();
+    const cliente = setupCliente.value.trim();
+
+    if (!data) {
+      return { ok: false, error: 'Data inizio tour obbligatoria.' };
+    }
+    // Range ±90gg da oggi
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dataD = new Date(data);
+    if (isNaN(dataD.getTime())) {
+      return { ok: false, error: 'Data inizio tour non valida.' };
+    }
+    const diffDays = Math.round((dataD - today) / (1000 * 60 * 60 * 24));
+    if (Math.abs(diffDays) > 90) {
+      return { ok: false, error: `Data fuori range (±90 giorni). Differenza: ${diffDays} giorni.` };
+    }
+
+    if (!regione) {
+      return { ok: false, error: 'Regione tour obbligatoria.' };
+    }
+    const sigla = TOUR_ID.siglaForRegion(regione);
+    if (!sigla) {
+      return { ok: false, error: `Regione "${regione}" non riconosciuta nel mapping ISTAT.` };
+    }
+
+    // Genera Tour ID
+    const gen = TOUR_ID.generate({ data_inizio: data, regione: regione });
+    if (!gen.ok) {
+      return { ok: false, error: gen.error || 'Generazione Tour ID fallita.' };
+    }
+
+    return {
+      ok: true,
+      tourSetup: {
+        tour_id: gen.tour_id,
+        data_inizio: data,
+        regione_sigla: sigla,
+        regione_label: gen.regione_label,
+        cliente: cliente,
+        progressivo: gen.progressivo,
+        yearMonth: gen.yearMonth
+      }
+    };
+  }
+
+  // Listener change su input → ricalcola preview + abilita/disabilita conferma
+  function onSetupChange() {
+    const v = validateSetup();
+    if (v.ok) {
+      setupPreviewId.textContent = v.tourSetup.tour_id;
+      setupPreview.classList.remove('hidden');
+      setupError.classList.add('hidden');
+      btnSetupConfirm.disabled = false;
+    } else {
+      setupPreview.classList.add('hidden');
+      // Mostra errore solo se l'utente ha già iniziato a compilare (non vuoto totale)
+      const isPristine = !setupDataInizio.value && !setupRegione.value && !setupCliente.value;
+      if (isPristine) {
+        setupError.classList.add('hidden');
+      } else {
+        setupError.textContent = v.error;
+        setupError.classList.remove('hidden');
+      }
+      btnSetupConfirm.disabled = true;
+    }
+  }
+
+  function onSetupConfirm() {
+    const v = validateSetup();
+    if (!v.ok) {
+      setupError.textContent = v.error;
+      setupError.classList.remove('hidden');
+      return;
+    }
+    state.tourSetup = v.tourSetup;
+    hideSetupForm();
+    // Ora parte davvero l'elaborazione
+    handleFile(state.file);
+  }
+
+  function onSetupCancel() {
+    state.file = null;
+    state.tourSetup = null;
+    hideSetupForm();
+    dz.classList.remove('hidden');
+    fileInput.value = '';
+  }
+
+  function bindSetupListeners() {
+    populateSetupRegions();
+    setupDataInizio.addEventListener('change', onSetupChange);
+    setupDataInizio.addEventListener('input', onSetupChange);
+    setupRegione.addEventListener('change', onSetupChange);
+    setupCliente.addEventListener('input', onSetupChange);
+    btnSetupConfirm.addEventListener('click', onSetupConfirm);
+    btnSetupCancel.addEventListener('click', onSetupCancel);
+  }
+
   // ───────── DROP ZONE handlers ─────────
   function bindDropzone() {
     dz.addEventListener('click', () => fileInput.click());
@@ -55,7 +231,8 @@
     });
     fileInput.addEventListener('change', (e) => {
       const f = e.target.files && e.target.files[0];
-      if (f) handleFile(f);
+      // MVP2: prima del processing mostra setup tour (data + regione obbligatorie)
+      if (f) showSetupForm(f);
     });
     ['dragenter', 'dragover'].forEach(ev => {
       dz.addEventListener(ev, (e) => {
@@ -71,7 +248,8 @@
     });
     dz.addEventListener('drop', (e) => {
       const f = e.dataTransfer.files && e.dataTransfer.files[0];
-      if (f) handleFile(f);
+      // MVP2: prima del processing mostra setup tour
+      if (f) showSetupForm(f);
     });
   }
 
@@ -118,11 +296,13 @@
       afterIstat: { rows: [], diffs: [], stats: {} },
       afterRegion: { ready: [], excluded: [], detected: null, pct: 0, distribution: {} },
       afterGeo: { rows: [], stats: {} },
-      selectedRegion: null
+      selectedRegion: null,
+      tourSetup: null
     };
     progress.classList.add('hidden');
     results.classList.add('hidden');
     errorBox.classList.add('hidden');
+    tourSetup.classList.add('hidden');
     dz.classList.remove('hidden');
     fileInput.value = '';
   }
@@ -192,6 +372,37 @@
 
       renderResults();
       showResults();
+
+      // MVP2: registra il tour nell'indice master (localStorage in MVP2,
+      // Drive in MVP3). Schema forward-compatible per archivio futuro.
+      // Vedi project_admin_search_tour_ux + coordinamento-admin-field-pipeline.
+      try {
+        if (window.TOUR_ID && state.tourSetup && state.tourSetup.tour_id) {
+          const readyCount = (state.afterGeo.rows && state.afterGeo.rows.length) || state.afterRegion.ready.length;
+          // Estrai province uniche dal ready (campo "provincia" o "provincia_PV"
+          // se presente, altrimenti vuoto). Lista forward-compatible.
+          const provinceSet = new Set();
+          (state.afterGeo.rows || state.afterRegion.ready || []).forEach(r => {
+            const pv = r && (r.provincia || r.provincia_PV || r.PROVINCIA || r.Provincia);
+            if (pv && String(pv).trim()) provinceSet.add(String(pv).trim().toUpperCase());
+          });
+          TOUR_ID.upsertEntry(state.tourSetup.tour_id, {
+            tour_id: state.tourSetup.tour_id,
+            data_inizio: state.tourSetup.data_inizio,
+            regione: state.tourSetup.regione_sigla,
+            regione_label: state.tourSetup.regione_label,
+            cliente: state.tourSetup.cliente,
+            province: Array.from(provinceSet).sort(),
+            totale_pvr: state.rawRows.length,
+            totale_pvr_bonificati: readyCount,
+            stato: 'in_corso',
+            percentuale_completamento: 0,
+            tool_version: EXPORT.TOOL_VERSION || '1.1.0'
+          });
+        }
+      } catch (e) {
+        console.warn('[app] registrazione indice tours fallita:', e);
+      }
     } catch (err) {
       console.error('[app] pipeline fallita:', err);
       showError(err);
@@ -386,12 +597,13 @@
     const lowGeoRows = (state.afterGeo.rows || []).filter(r =>
       r.geo_confidence === 'low' || r.geo_confidence === 'none'
     );
+    const setup = state.tourSetup || { tour_id: '', data_inizio: '', regione_sigla: '', regione_label: '', cliente: '' };
     const items = [
-      { key: 'final',    name: 'PVR ready (per Field/Admin)', count: readyRows.length, fn: () => EXPORT.exportFinal(readyRows, state.baseName) },
-      { key: 'diff',     name: 'Correzioni ISTAT (dip. dati)', count: state.afterIstat.diffs.length, fn: () => EXPORT.exportDiff(state.afterIstat.diffs, state.baseName) },
-      { key: 'issues',   name: 'Anomalie testo (dip. dati)', count: state.afterBonifica.issues.length, fn: () => EXPORT.exportIssues(state.afterBonifica.issues, state.baseName) },
-      { key: 'excluded', name: 'Outlier fuori regione (dip. dati)', count: state.afterRegion.excluded.length, fn: () => EXPORT.exportExcluded(state.afterRegion.excluded, state.baseName) },
-      { key: 'lowgeo',   name: 'Geocoding low (dip. dati)', count: lowGeoRows.length, fn: () => EXPORT.exportGeocodingLow(lowGeoRows, state.baseName) }
+      { key: 'final',    name: 'PVR ready (per Field/Admin)', count: readyRows.length, fn: () => EXPORT.exportFinal(readyRows, setup) },
+      { key: 'diff',     name: 'Correzioni ISTAT (dip. dati)', count: state.afterIstat.diffs.length, fn: () => EXPORT.exportDiff(state.afterIstat.diffs, setup) },
+      { key: 'issues',   name: 'Anomalie testo (dip. dati)', count: state.afterBonifica.issues.length, fn: () => EXPORT.exportIssues(state.afterBonifica.issues, setup) },
+      { key: 'excluded', name: 'Outlier fuori regione (dip. dati)', count: state.afterRegion.excluded.length, fn: () => EXPORT.exportExcluded(state.afterRegion.excluded, setup) },
+      { key: 'lowgeo',   name: 'Geocoding low (dip. dati)', count: lowGeoRows.length, fn: () => EXPORT.exportGeocodingLow(lowGeoRows, setup) }
     ];
     downloadRow.innerHTML = items.map(it => `
       <div class="dl-card">
@@ -416,13 +628,14 @@
     const lowGeoRows = (state.afterGeo.rows || []).filter(r =>
       r.geo_confidence === 'low' || r.geo_confidence === 'none'
     );
+    const setup = state.tourSetup || { tour_id: '', data_inizio: '', regione_sigla: '', regione_label: '', cliente: '' };
     EXPORT.exportAll({
       ready: readyRows,
       diffs: state.afterIstat.diffs,
       issues: state.afterBonifica.issues,
       excluded: state.afterRegion.excluded,
       geocodingLow: lowGeoRows
-    }, state.baseName);
+    }, setup);
   });
 
   btnRestart.addEventListener('click', reset);
@@ -438,5 +651,6 @@
 
   // ───────── Init ─────────
   bindDropzone();
+  bindSetupListeners();
 
 })();
