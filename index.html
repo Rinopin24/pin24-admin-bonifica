@@ -93,11 +93,11 @@
         <small class="setup-hint">La sigla ISTAT 3 lettere verrà inserita nel Tour ID (es. <code>PUG</code> per Puglia). L'app la rileva dal file ma puoi sempre modificarla.</small>
       </div>
 
-      <div class="setup-field">
-        <label for="setup-cliente">Cliente / committente</label>
-        <input type="text" id="setup-cliente" placeholder="Opzionale (es. ENI, REWE)" maxlength="40">
-        <small class="setup-hint">Utile solo se hai più committenti da distinguere nei report. Lascia vuoto se non necessario.</small>
-      </div>
+      <!-- Campo Cliente/committente rimosso da v1.1.2 perché non utile per la
+           ricerca attuale. Lo schema metadati lo mantiene come campo opzionale
+           per riattivarlo in futuro. Vedi project_coordinamento_admin_field_pipeline. -->
+      <input type="hidden" id="setup-cliente" value="">
+
 
       <div class="setup-preview hidden" id="setup-preview">
         <span class="preview-label">Tour ID che verrà creato:</span>
