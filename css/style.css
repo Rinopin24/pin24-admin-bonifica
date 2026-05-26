@@ -515,5 +515,133 @@ tbody tr.row-excluded td { background: rgba(202,26,31,0.06); }
 }
 .footer-spacer { margin: 0 8px; }
 
+/* ═══════════ SETUP TOUR (MVP2) ═══════════
+   Sezione bloccante mostrata dopo il drop file. 3 campi obbligatori,
+   anteprima Tour ID auto-calcolato, bottone Avvia elaborazione abilitato
+   solo quando data + regione sono valide.
+   ═══════════════════════════════════════════════════════════ */
+.tour-setup {
+  max-width: 720px;
+  margin: 32px auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+.setup-header {
+  padding: 24px 28px 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+.setup-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+}
+.setup-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.setup-sub strong { color: var(--text-primary); }
+
+.setup-form {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.setup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.setup-field label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--text-primary);
+}
+.setup-field .required {
+  color: var(--brand-red);
+  font-weight: 700;
+}
+.setup-field input[type="date"],
+.setup-field input[type="text"],
+.setup-field select {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.setup-field input[type="date"]:focus,
+.setup-field input[type="text"]:focus,
+.setup-field select:focus {
+  border-color: var(--brand-red);
+}
+.setup-field input[type="date"] {
+  color-scheme: dark;
+}
+.setup-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.setup-hint code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--bg-elevated);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.setup-preview {
+  margin-top: 4px;
+  padding: 14px 16px;
+  background: var(--brand-red-soft);
+  border: 1px solid var(--brand-red);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.preview-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.preview-id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.setup-error {
+  padding: 10px 14px;
+  background: rgba(202,26,31,0.12);
+  border-left: 3px solid var(--brand-red);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.setup-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.setup-actions .btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ═══════════ UTILS ═══════════ */
 .hidden { display: none !important; }

@@ -1,16 +1,37 @@
 // ═══════════════════════════════════════════════════════════════════
-// export.js — produzione dei 4 file output finali
-// 1. <basename>_final.xlsx        → PVR ready per Field/Admin
-// 2. <basename>_diff_istat.xlsx   → correzioni ISTAT per dip. dati
-// 3. <basename>_issues_testo.csv  → anomalie testo per dip. dati
-// 4. <basename>_excluded_outliers.xlsx → PVR fuori regione tour
+// export.js — produzione dei 5 file output finali con naming Tour ID
+// ═══════════════════════════════════════════════════════════════════
+// Pattern naming (MVP2, decisione 2026-05-25):
+//   <Tour-ID>_<data-inizio>_<Fase>_<N>PVR.xlsx
+//
+// Fasi mappate:
+//   final / ready    → "Bonificato"
+//   diff istat       → "DiffISTAT"
+//   issues testo     → "Issues-testo"        (CSV per dipartimento dati)
+//   excluded outl.   → "Excluded-outliers"
+//   geocoding low    → "Geocoding-low"
+//
+// Il file "Bonificato" include un foglio nascosto _pin24_meta con i
+// metadati del tour. Field/Admin lo leggono all'import per evitare
+// doppia processazione.
+//
+// Memoria di riferimento: [[coordinamento-admin-field-pipeline]].
 // ═══════════════════════════════════════════════════════════════════
 
 (function (global) {
   'use strict';
 
+  const FASE = {
+    BONIFICATO: 'Bonificato',
+    DIFF_ISTAT: 'DiffISTAT',
+    ISSUES: 'Issues-testo',
+    EXCLUDED: 'Excluded-outliers',
+    GEO_LOW: 'Geocoding-low'
+  };
+
+  const TOOL_VERSION = '1.1.0'; // bump per MVP2
+
   function sanitizeBase(filename) {
-    // Rimuove estensione e parentesi/spazi indesiderabili
     return String(filename || 'pvr')
       .replace(/\.(xlsx|xls|csv)$/i, '')
       .replace(/[()]/g, '')
@@ -18,52 +39,107 @@
       .trim();
   }
 
-  function exportFinal(rows, baseName) {
+  // Costruisce nome file convenzionale.
+  // setup: { tour_id, data_inizio, ... }  (richiesto)
+  // fase:  stringa "Bonificato" / "DiffISTAT" / ecc.
+  // count: numero PVR/righe contenute nel file
+  // ext:   "xlsx" o "csv"
+  function _buildFilename(setup, fase, count, ext) {
+    if (!setup || !setup.tour_id || !setup.data_inizio || !fase) {
+      // Fallback al naming legacy quando setup mancante (es. uso programmatico
+      // del modulo da contesto non-MVP2). Non dovrebbe mai accadere in UI.
+      return `pin24_${fase || 'output'}_${Date.now()}.${ext}`;
+    }
+    const safeCount = (typeof count === 'number' && count > 0) ? `_${count}PVR` : '';
+    return `${setup.tour_id}_${setup.data_inizio}_${fase}${safeCount}.${ext}`;
+  }
+
+  // Metadati strutturati scritti dentro il file Bonificato.
+  // Schema deve essere stabile tra versioni (forward-compatible) per non
+  // rompere Field/Admin all'import.
+  function _buildMeta(setup, pvrCount) {
+    const now = new Date().toISOString();
+    return {
+      bonificato: true,
+      bonificato_at: now,
+      tool_name: 'pin24-admin-bonifica',
+      tool_version: TOOL_VERSION,
+      schema_version: 1,
+      tour_id: setup.tour_id || '',
+      data_inizio: setup.data_inizio || '',
+      regione: setup.regione_sigla || '',
+      regione_label: setup.regione_label || '',
+      cliente: setup.cliente || '',
+      pvr_count: pvrCount || 0
+    };
+  }
+
+  function exportFinal(rows, setup) {
     if (!rows || rows.length === 0) return null;
-    const fn = sanitizeBase(baseName) + '_final.xlsx';
-    XLSX_IO.writeXlsx(rows, fn);
+    const fn = _buildFilename(setup, FASE.BONIFICATO, rows.length, 'xlsx');
+    if (XLSX_IO.writeXlsxWithMeta) {
+      XLSX_IO.writeXlsxWithMeta(rows, fn, {
+        sheetName: 'PVR',
+        meta: _buildMeta(setup, rows.length)
+      });
+    } else {
+      XLSX_IO.writeXlsx(rows, fn);
+    }
     return fn;
   }
 
-  function exportDiff(diffs, baseName) {
+  function exportDiff(diffs, setup) {
     if (!diffs || diffs.length === 0) return null;
-    const fn = sanitizeBase(baseName) + '_diff_istat.xlsx';
+    const fn = _buildFilename(setup, FASE.DIFF_ISTAT, diffs.length, 'xlsx');
     XLSX_IO.writeXlsx(diffs, fn);
     return fn;
   }
 
-  function exportIssues(issues, baseName) {
+  function exportIssues(issues, setup) {
     if (!issues || issues.length === 0) return null;
-    const fn = sanitizeBase(baseName) + '_issues_testo.csv';
+    const fn = _buildFilename(setup, FASE.ISSUES, issues.length, 'csv');
     XLSX_IO.writeCsv(issues, fn);
     return fn;
   }
 
-  function exportExcluded(excluded, baseName) {
+  function exportExcluded(excluded, setup) {
     if (!excluded || excluded.length === 0) return null;
-    const fn = sanitizeBase(baseName) + '_excluded_outliers.xlsx';
+    const fn = _buildFilename(setup, FASE.EXCLUDED, excluded.length, 'xlsx');
     XLSX_IO.writeXlsx(excluded, fn);
     return fn;
   }
 
-  function exportGeocodingLow(lowRows, baseName) {
+  function exportGeocodingLow(lowRows, setup) {
     if (!lowRows || lowRows.length === 0) return null;
-    const fn = sanitizeBase(baseName) + '_geocoding_low.xlsx';
+    const fn = _buildFilename(setup, FASE.GEO_LOW, lowRows.length, 'xlsx');
     XLSX_IO.writeXlsx(lowRows, fn);
     return fn;
   }
 
-  function exportAll(result, baseName) {
+  // setup = { tour_id, data_inizio, regione_sigla, regione_label, cliente }
+  function exportAll(result, setup) {
     const written = [];
     let fn;
-    fn = exportFinal(result.ready, baseName); if (fn) written.push(fn);
-    fn = exportDiff(result.diffs, baseName); if (fn) written.push(fn);
-    fn = exportIssues(result.issues, baseName); if (fn) written.push(fn);
-    fn = exportExcluded(result.excluded, baseName); if (fn) written.push(fn);
-    fn = exportGeocodingLow(result.geocodingLow, baseName); if (fn) written.push(fn);
+    fn = exportFinal(result.ready, setup);            if (fn) written.push(fn);
+    fn = exportDiff(result.diffs, setup);             if (fn) written.push(fn);
+    fn = exportIssues(result.issues, setup);          if (fn) written.push(fn);
+    fn = exportExcluded(result.excluded, setup);      if (fn) written.push(fn);
+    fn = exportGeocodingLow(result.geocodingLow, setup); if (fn) written.push(fn);
     return written;
   }
 
-  global.EXPORT = { exportFinal, exportDiff, exportIssues, exportExcluded, exportGeocodingLow, exportAll, sanitizeBase };
+  global.EXPORT = {
+    FASE,
+    TOOL_VERSION,
+    exportFinal,
+    exportDiff,
+    exportIssues,
+    exportExcluded,
+    exportGeocodingLow,
+    exportAll,
+    sanitizeBase,
+    _buildFilename,
+    _buildMeta
+  };
 
 })(typeof window !== 'undefined' ? window : globalThis);
