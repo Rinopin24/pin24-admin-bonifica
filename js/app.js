@@ -11,7 +11,7 @@
   // Mostrata nel footer e usata dal toast cold start per detect aggiornamenti.
   // Quando si rilascia una nuova versione: aggiornare QUI E il version tag
   // nell'header in index.html.
-  const APP_VERSION = 'v1.1.0 · 26 mag 2026';
+  const APP_VERSION = 'v1.1.2 · 26 mag 2026';
   const LAST_SEEN_KEY = 'pin24_bonifica_last_seen_version';
   window.PIN24_BONIFICA_VERSION = APP_VERSION;
 
@@ -179,7 +179,7 @@
       // (in questo caso non c'è "detected region" certificata da confrontare,
       // quindi non è un "override": l'utente può cambiarla via dropdown se vuole).
       if (top && TOUR_ID.siglaForRegion(top[0])) {
-        setupRegione.value = top[0];
+        setupRegione.value = _canonicalRegionLabel(top[0]);
         _regionUIState = 'confirmed';
       } else {
         _regionUIState = 'pending';
@@ -187,14 +187,27 @@
     }
   }
 
+  // Normalizza il label regione al formato canonico del dropdown ("Puglia"
+  // non "PUGLIA"). REGION_FILTER.detectTourRegion ritorna uppercase tramite
+  // normRegion: senza questa conversione, setupRegione.value rimane vuoto
+  // perché le options del dropdown hanno value="Puglia" (capitalize) e il
+  // browser non trova match con "PUGLIA".
+  function _canonicalRegionLabel(any) {
+    if (!any || !window.TOUR_ID) return any || '';
+    const sigla = TOUR_ID.siglaForRegion(any);
+    if (!sigla) return any;
+    return TOUR_ID.labelForSigla(sigla) || any;
+  }
+
   // L'utente accetta la regione auto-detected
   function onRegionConfirm() {
     if (!_detectedRegion) return;
-    setupRegione.value = _detectedRegion; // popola dropdown nascosto per validate
+    const canon = _canonicalRegionLabel(_detectedRegion);
+    setupRegione.value = canon; // popola dropdown nascosto per validate
     _regionUIState = 'confirmed';
     regionDetectedActions.classList.add('hidden');
     regionConfirmedBadge.classList.remove('hidden');
-    regionConfirmedLabel.textContent = _detectedRegion;
+    regionConfirmedLabel.textContent = canon;
     regionOverrideBlock.classList.add('hidden');
     regionOverrideNotice.classList.add('hidden');
     onSetupChange();
@@ -211,8 +224,8 @@
       regionOverrideNotice.classList.remove('hidden');
     }
     // Pre-seleziona la regione auto-detected come default del dropdown (l'utente
-    // può comunque scegliere altra)
-    if (_detectedRegion) setupRegione.value = _detectedRegion;
+    // può comunque scegliere altra). Normalizza al formato canonico del dropdown.
+    if (_detectedRegion) setupRegione.value = _canonicalRegionLabel(_detectedRegion);
     setupRegione.focus();
     onSetupChange();
   }
@@ -287,18 +300,18 @@
       return { ok: false, error: `Data fuori range (±90 giorni). Differenza: ${diffDays} giorni.` };
     }
 
+    // MVP2.1 (ordine fix v1.1.2): controllo conferma esplicita PRIMA di
+    // qualunque altro check, così se la regione è rilevata ma non confermata
+    // l'utente vede il messaggio significativo invece di "obbligatoria".
+    if (_regionUIState !== 'confirmed') {
+      return { ok: false, error: 'Conferma la regione del tour (tap su Conferma o Modifica).' };
+    }
     if (!regione) {
-      return { ok: false, error: 'Regione tour obbligatoria.' };
+      return { ok: false, error: 'Regione tour mancante.' };
     }
     const sigla = TOUR_ID.siglaForRegion(regione);
     if (!sigla) {
       return { ok: false, error: `Regione "${regione}" non riconosciuta nel mapping ISTAT.` };
-    }
-    // MVP2.1: la regione deve essere stata confermata esplicitamente (click
-    // su Conferma per auto-detect, o cambio dropdown per override). Previene
-    // submit accidentale con auto-detect non visionato.
-    if (_regionUIState !== 'confirmed') {
-      return { ok: false, error: 'Conferma la regione del tour (Conferma o Modifica).' };
     }
 
     // Genera Tour ID
