@@ -11,7 +11,7 @@
   // Mostrata nel footer e usata dal toast cold start per detect aggiornamenti.
   // Quando si rilascia una nuova versione: aggiornare QUI E il version tag
   // nell'header in index.html.
-  const APP_VERSION = 'v1.1.2 · 26 mag 2026';
+  const APP_VERSION = 'v1.1.3 · 31 mag 2026';
   const LAST_SEEN_KEY = 'pin24_bonifica_last_seen_version';
   window.PIN24_BONIFICA_VERSION = APP_VERSION;
 
@@ -828,9 +828,39 @@
   // Confronta APP_VERSION corrente con quella vista in passato (localStorage).
   // Se diversa → toast "Tool aggiornato alla versione X" per 6s. Stile coerente
   // con il toast Field (icona check verde Lucide).
+  // Suono notifica: due beep brevi via Web Audio API. Stessi parametri
+  // del toast Field per coerenza. Silent fail se audio non disponibile o
+  // se il contesto è suspended (no user gesture su cold start).
+  function playNotificationSound() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      const ctx = new AC();
+      if (ctx.state === 'suspended' && ctx.resume) ctx.resume().catch(() => {});
+      const now = ctx.currentTime;
+      playBeep(ctx, now,        880, 0.12, 0.18);
+      playBeep(ctx, now + 0.18, 1175, 0.12, 0.18);
+      setTimeout(() => { try { ctx.close(); } catch (e) {} }, 800);
+    } catch (err) { /* silent */ }
+  }
+  function playBeep(ctx, startAt, freq, duration, gainPeak) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, startAt);
+    gain.gain.linearRampToValueAtTime(gainPeak, startAt + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startAt);
+    osc.stop(startAt + duration + 0.02);
+  }
+
   function showUpdateToast(versionLabel) {
     const ex = document.getElementById('update-toast');
     if (ex && ex.parentNode) ex.parentNode.removeChild(ex);
+    playNotificationSound();
     const el = document.createElement('div');
     el.id = 'update-toast';
     el.className = 'update-toast';
@@ -860,7 +890,14 @@
   }
 
   // ───────── Init ─────────
-  // Footer version tag (single source of truth = APP_VERSION)
+  // Header e footer version tag (single source of truth = APP_VERSION).
+  // Header mostra solo il numero versione (es. "v1.1.2"), footer la stringa
+  // estesa con data (es. "v1.1.2 · 26 mag 2026").
+  const headerVersionTag = document.getElementById('header-version-tag');
+  if (headerVersionTag) {
+    const short = _parseVersionNumber(APP_VERSION) || APP_VERSION;
+    headerVersionTag.textContent = short;
+  }
   const footerVersionTag = document.getElementById('footer-version-tag');
   if (footerVersionTag) footerVersionTag.textContent = APP_VERSION;
 

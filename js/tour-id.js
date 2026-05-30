@@ -83,10 +83,14 @@
     const norm = String(regionLabel).trim();
     // Match esatto
     if (REGION_SIGLA[norm]) return REGION_SIGLA[norm];
-    // Match case-insensitive
-    const lower = norm.toLowerCase();
+    // Match case-insensitive con normalizzazione trattino/spazio
+    // (fix locale 2026-05-30: "EMILIA ROMAGNA" da file XLSX vs
+    // "Emilia-Romagna" nel mapping ISTAT — non commitato, da
+    // portare in repo come v1.1.3)
+    const normalize = s => s.toLowerCase().replace(/[-\s]+/g, ' ').trim();
+    const lower = normalize(norm);
     for (const [label, sigla] of Object.entries(REGION_SIGLA)) {
-      if (label.toLowerCase() === lower) return sigla;
+      if (normalize(label) === lower) return sigla;
     }
     // Se l'input è già una sigla 3 lettere maiuscola riconosciuta, ritornala
     const upper = norm.toUpperCase();
