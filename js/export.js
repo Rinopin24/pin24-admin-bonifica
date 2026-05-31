@@ -29,7 +29,19 @@
     GEO_LOW: 'Geocoding-low'
   };
 
-  const TOOL_VERSION = '1.1.0'; // bump per MVP2
+  // tool_version letto LAZY al momento dell'export (NON al load del modulo),
+  // perché export.js carica prima di app.js → al load PIN24_BONIFICA_VERSION
+  // non è ancora definita. Single source of truth in app.js APP_VERSION.
+  // Estrae solo il numero versione dalla stringa "v1.1.4 · 31 mag 2026" → "1.1.4".
+  // Fix bug 2026-05-31: prima TOOL_VERSION era const hardcoded '1.1.0', mai
+  // sincronizzato con APP_VERSION.
+  function getToolVersion() {
+    try {
+      const raw = (typeof window !== 'undefined' && window.PIN24_BONIFICA_VERSION) || '';
+      const m = /v?(\d+\.\d+\.\d+)/.exec(raw);
+      return m ? m[1] : '1.1.4';
+    } catch (e) { return '1.1.4'; }
+  }
 
   function sanitizeBase(filename) {
     return String(filename || 'pvr')
@@ -63,7 +75,7 @@
       bonificato: true,
       bonificato_at: now,
       tool_name: 'pin24-admin-bonifica',
-      tool_version: TOOL_VERSION,
+      tool_version: getToolVersion(),
       schema_version: 1,
       tour_id: setup.tour_id || '',
       data_inizio: setup.data_inizio || '',
@@ -130,7 +142,7 @@
 
   global.EXPORT = {
     FASE,
-    TOOL_VERSION,
+    get TOOL_VERSION() { return getToolVersion(); }, // lazy getter (vedi commento riga 30)
     exportFinal,
     exportDiff,
     exportIssues,

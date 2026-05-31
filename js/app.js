@@ -11,7 +11,7 @@
   // Mostrata nel footer e usata dal toast cold start per detect aggiornamenti.
   // Quando si rilascia una nuova versione: aggiornare QUI E il version tag
   // nell'header in index.html.
-  const APP_VERSION = 'v1.1.3 · 31 mag 2026';
+  const APP_VERSION = 'v1.1.4 · 31 mag 2026';
   const LAST_SEEN_KEY = 'pin24_bonifica_last_seen_version';
   window.PIN24_BONIFICA_VERSION = APP_VERSION;
 
